@@ -127,7 +127,8 @@ const accountService = {
 			try {
 				const recipient = accountRow.email.toLowerCase();
 				route = await c.env.ws.getByName(`email-route:${recipient}`).syncEmailRoute(recipient);
-			} catch {
+			} catch (error) {
+				console.warn('Email Routing sync failed', error?.message?.startsWith('Email Routing ') ? error.message : error?.name);
 				throw new BizError(t('emailRoutingRetry'), 503);
 			}
 			if (route !== 'ready') {

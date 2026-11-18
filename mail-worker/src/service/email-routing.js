@@ -11,9 +11,11 @@ export async function ensureEmailRoute(env, email) {
 	const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 	const request = async (path, method, body) => {
 		const response = await fetch(path, { method, headers, body, signal, redirect: 'error' });
-		if (!response.ok) throw new Error(`Email Routing API returned HTTP ${response.status}`);
-		const data = await response.json();
-		if (data.success !== true) throw new Error('Email Routing API rejected the request');
+		const data = await response.json().catch(() => null);
+		if (!response.ok || data?.success !== true) {
+			const code = data?.errors?.[0]?.code;
+			throw new Error(`Email Routing ${method} failed: HTTP ${response.status}, code ${Number.isInteger(code) ? code : 'none'}`);
+		}
 		return data;
 	};
 	const matching = rule => rule.matchers?.some(matcher =>
