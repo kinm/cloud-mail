@@ -2,6 +2,7 @@ const en = {
 	IncorrectPwd: 'Incorrect password',
 	addAccountDisabled: 'Add Email Address feature is disabled',
 	emailRoutingRetry: 'The mailbox was saved, but the Cloudflare routing rule could not be confirmed. Submit the same address to retry.',
+	emailRoutingCleanupRetry: 'Cloudflare routing cleanup failed. The mailbox was kept. Try deleting it again later.',
 	emailRoutingConflict: 'The mailbox was saved, but an existing Cloudflare rule is disabled or points elsewhere. Contact your administrator.',
 	emailRoutingAddressTooLong: 'Cloudflare routing addresses are limited to 90 characters.',
 	regDisabled: 'Sign up is disabled',

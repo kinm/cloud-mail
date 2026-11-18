@@ -126,11 +126,12 @@ const accountService = {
 			let route;
 			try {
 				const recipient = accountRow.email.toLowerCase();
-				route = await c.env.ws.getByName(`email-route:${recipient}`).syncEmailRoute(recipient);
+				route = await c.env.ws.getByName(`email-route:${recipient}`).syncEmailRoute(recipient, accountRow.accountId);
 			} catch (error) {
 				console.warn('Email Routing sync failed', error?.message?.startsWith('Email Routing ') ? error.message : error?.name);
 				throw new BizError(t('emailRoutingRetry'), 503);
 			}
+			if (route === 'inactive') throw new BizError(t('isDelAccount'));
 			if (route !== 'ready') {
 				throw new BizError(t('emailRoutingConflict'), 409);
 			}
@@ -186,7 +187,8 @@ const accountService = {
 		let { accountId } = params;
 
 		const user = await userService.selectById(c, userId);
-		const accountRow = await this.selectById(c, accountId);
+		const accountRow = await this.selectByIdIncludeDel(c, accountId);
+		if (!accountRow) return;
 
 		if (accountRow.email === user.email) {
 			throw new BizError(t('delMyAccount'));
@@ -201,11 +203,30 @@ const accountService = {
 			await this.physicsDelete(c, { accountId });
 			return;
 		}
+		if (await this.deleteMailboxRoute(c, accountRow)) return;
 
 		await orm(c).update(account).set({ isDel: isDel.DELETE }).where(
 			and(eq(account.userId, userId),
 				eq(account.accountId, accountId)))
 			.run();
+	},
+
+	selectByIdIncludeDel(c, accountId) {
+		return orm(c).select().from(account).where(eq(account.accountId, accountId)).get();
+	},
+
+	async deleteMailboxRoute(c, accountRow) {
+		if (!c.env.cf_email_routing_domain || emailUtils.getDomain(accountRow.email) !== c.env.cf_email_routing_domain) {
+			return false;
+		}
+		const email = accountRow.email.toLowerCase();
+		try {
+			await c.env.ws.getByName(`email-route:${email}`).deleteMailboxRoute(email, accountRow.accountId);
+			return true;
+		} catch (error) {
+			console.warn('Email Routing cleanup failed', error?.message?.startsWith('Email Routing ') ? error.message : error?.name);
+			throw new BizError(t('emailRoutingCleanupRetry'), 503);
+		}
 	},
 
 	selectById(c, accountId) {
@@ -224,6 +245,10 @@ const accountService = {
 	},
 
 	async physicsDeleteByUserIds(c, userIds) {
+		if (c.env.cf_email_routing_domain) {
+			const accounts = await orm(c).select().from(account).where(inArray(account.userId, userIds)).all();
+			for (const row of accounts) await this.deleteMailboxRoute(c, row);
+		}
 		await emailService.physicsDeleteUserIds(c, userIds);
 		await orm(c).delete(account).where(inArray(account.userId,userIds)).run();
 	},
@@ -254,6 +279,14 @@ const accountService = {
 
 	async restoreByUserId(c, userId) {
 		await orm(c).update(account).set({isDel: isDel.NORMAL}).where(eq(account.userId, userId)).run();
+		if (c.env.cf_email_routing_domain) {
+			const accounts = await orm(c).select().from(account).where(eq(account.userId, userId)).all();
+			for (const row of accounts.filter(row => emailUtils.getDomain(row.email) === c.env.cf_email_routing_domain)) {
+				const email = row.email.toLowerCase();
+				const status = await c.env.ws.getByName(`email-route:${email}`).syncEmailRoute(email, row.accountId, true);
+				if (status === 'conflict') throw new BizError(t('emailRoutingConflict'), 409);
+			}
+		}
 	},
 
 	async setName(c, params, userId) {
@@ -289,6 +322,8 @@ const accountService = {
 
 	async physicsDelete(c, params) {
 		const { accountId } = params
+		const accountRow = await this.selectByIdIncludeDel(c, accountId);
+		if (accountRow) await this.deleteMailboxRoute(c, accountRow);
 		await emailService.physicsDeleteByAccountId(c, accountId)
 		await orm(c).delete(account).where(eq(account.accountId, accountId)).run();
 	},

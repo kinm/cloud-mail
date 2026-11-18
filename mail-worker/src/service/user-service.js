@@ -124,8 +124,8 @@ const userService = {
 	async physicsDelete(c, params) {
 		let { userIds } = params;
 		userIds = userIds.split(',').map(Number);
-		await starService.removeByUserIds(c, userIds);
 		await accountService.physicsDeleteByUserIds(c, userIds);
+		await starService.removeByUserIds(c, userIds);
 		await oauthService.deleteByUserIds(c, userIds);
 		await orm(c).delete(user).where(inArray(user.userId, userIds)).run();
 	},
