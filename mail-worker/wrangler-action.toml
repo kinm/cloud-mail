@@ -51,6 +51,9 @@ ai_model = "${AI_MODEL}"
 analysis_cache = "${ANALYSIS_CACHE}"
 #orm_log = false
 domain = "${DOMAIN}"
+cf_email_routing_domain = "${CF_EMAIL_ROUTING_DOMAIN}"
+CF_EMAIL_ROUTING_ZONE_ID = "${CF_EMAIL_ROUTING_ZONE_ID}"
+cf_email_routing_worker = "${NAME}"
 admin = "${ADMIN}"
 project_link = "${PROJECT_LINK}"
 

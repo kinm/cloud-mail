@@ -510,7 +510,7 @@ function submit() {
   accountAdd(addForm.email + addForm.suffix, verifyToken).then(account => {
     addLoading.value = false
     addForm.email = ''
-    accounts.push(account)
+    if (!accounts.some(item => item.accountId === account.accountId)) accounts.push(account)
     verifyToken = ''
     settingStore.settings.addVerifyOpen = account.addVerifyOpen
     ElMessage({
@@ -522,7 +522,7 @@ function submit() {
     showAdd.value = false
     userStore.refreshUserInfo()
   }).catch(res => {
-    if (res.code === 400) {
+    if (res?.code === 400 || verifyToken) {
       verifyToken = ''
       if (turnstileId) {
         window.turnstile.reset(turnstileId)

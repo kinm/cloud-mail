@@ -1,8 +1,14 @@
 import { DurableObject } from 'cloudflare:workers';
+import { ensureEmailRoute } from '../service/email-routing';
 
 // 每个用户一个实例（按 userId 命名），全部邮件共用 ALL_EMAIL_HUB。
 // 使用 Hibernation WebSocket：空闲可休眠，连接仍保持。
 export class MailHub extends DurableObject {
+	// 同一收件地址的请求共用一个独立实例，避免同时创建重复的 Cloudflare 规则。
+	async syncEmailRoute(email) {
+		this.routeSync ??= ensureEmailRoute(this.env, email).finally(() => { this.routeSync = undefined; });
+		return this.routeSync;
+	}
 
 	// 接受浏览器的 WebSocket 升级，接入当前 hub。
 	async fetch(request) {

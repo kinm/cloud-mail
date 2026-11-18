@@ -1,6 +1,9 @@
 const zh = {
 	IncorrectPwd: '密码输入错误',
 	addAccountDisabled: '添加邮箱功能已关闭',
+	emailRoutingRetry: '邮箱已保存，但 Cloudflare 收信规则尚未确认。请重新提交同一地址重试。',
+	emailRoutingConflict: '邮箱已保存，但已有同地址的 Cloudflare 规则停用或指向其他目标。请联系管理员检查规则。',
+	emailRoutingAddressTooLong: 'Cloudflare 收信地址最多支持 90 个字符。',
 	regDisabled: '注册功能已关闭',
 	emptyEmail: '邮箱不能为空',
 	emptyAccountId: 'accountId不能为空',

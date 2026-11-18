@@ -47,20 +47,24 @@ const accountService = {
 			throw new BizError(t('banEmailPrefix'));
 		}
 
+		const syncRouting = emailUtils.getDomain(email) === c.env.cf_email_routing_domain;
+		if (syncRouting && email.length > 90) {
+			throw new BizError(t('emailRoutingAddressTooLong'));
+		}
 		let accountRow = await this.selectByEmailIncludeDel(c, email);
 
 		if (accountRow && accountRow.isDel === isDel.DELETE) {
 			throw new BizError(t('isDelAccount'));
 		}
 
-		if (accountRow) {
+		if (accountRow && (!syncRouting || accountRow.userId !== userId)) {
 			throw new BizError(t('isRegAccount'));
 		}
 
 		if (email.includes('+')) {
 			const baseEmail = emailUtils.getBaseEmail(email);
 			const baseAccount = await this.selectByEmailIncludeDel(c, baseEmail);
-			if (!baseAccount || baseAccount.userId !== userId) {
+			if (!baseAccount || baseAccount.userId !== userId || (syncRouting && baseAccount.isDel === isDel.DELETE)) {
 				throw new BizError(t('notOwner'));
 			}
 		}
@@ -70,7 +74,7 @@ const accountService = {
 
 		if (userRow.email !== c.env.admin) {
 
-			if (roleRow.accountCount > 0) {
+			if (!accountRow && roleRow.accountCount > 0) {
 				const userAccountCount = await accountService.countUserAccount(c, userId)
 				if(userAccountCount >= roleRow.accountCount) throw new BizError(t('accountLimit'), 403);
 			}
@@ -96,11 +100,39 @@ const accountService = {
 		}
 
 
-		accountRow = await orm(c).insert(account).values({ email: email, userId: userId, name: emailUtils.getName(email) }).returning().get();
+		let created = false;
+		if (!accountRow) {
+			const insert = orm(c).insert(account).values({ email, userId, name: emailUtils.getName(email) });
+			accountRow = await (syncRouting ? insert.onConflictDoNothing() : insert).returning().get();
+			created = Boolean(accountRow);
+			if (!created) {
+				accountRow = await this.selectByEmailIncludeDel(c, email);
+				if (!accountRow || accountRow.isDel === isDel.DELETE || accountRow.userId !== userId) {
+					throw new BizError(t('isRegAccount'));
+				}
+			}
+		}
 
 		if (addEmailVerify === settingConst.addEmailVerify.COUNT && !addVerifyOpen) {
-			const row = await verifyRecordService.increaseAddCount(c);
-			addVerifyOpen = row.count >= addVerifyCount
+			if (created) {
+				const row = await verifyRecordService.increaseAddCount(c);
+				addVerifyOpen = row.count >= addVerifyCount;
+			} else {
+				addVerifyOpen = await verifyRecordService.isOpenAddVerify(c, addVerifyCount);
+			}
+		}
+
+		if (syncRouting) {
+			let route;
+			try {
+				const recipient = accountRow.email.toLowerCase();
+				route = await c.env.ws.getByName(`email-route:${recipient}`).syncEmailRoute(recipient);
+			} catch {
+				throw new BizError(t('emailRoutingRetry'), 503);
+			}
+			if (route !== 'ready') {
+				throw new BizError(t('emailRoutingConflict'), 409);
+			}
 		}
 
 		accountRow.addVerifyOpen = addVerifyOpen
