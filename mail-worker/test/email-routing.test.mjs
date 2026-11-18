@@ -19,6 +19,7 @@ test('creates an enabled literal rule for an unused address', async (t) => {
 	const fetchMock = t.mock.method(globalThis, 'fetch', async (url, init) => {
 		assert.equal(new URL(url).pathname, `/client/v4/zones/${env.CF_EMAIL_ROUTING_ZONE_ID}/email/routing/rules`);
 		assert.equal(init.headers.Authorization, 'Bearer test-token');
+		assert.equal(init.redirect, 'manual');
 		if (init.method === 'POST') {
 			assert.deepEqual(JSON.parse(init.body), rule);
 			return ok(rule);

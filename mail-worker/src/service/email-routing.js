@@ -10,7 +10,7 @@ export async function ensureEmailRoute(env, email) {
 	const signal = AbortSignal.timeout(8000);
 	const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 	const request = async (path, method, body) => {
-		const response = await fetch(path, { method, headers, body, signal, redirect: 'error' });
+		const response = await fetch(path, { method, headers, body, signal, redirect: 'manual' });
 		const data = await response.json().catch(() => null);
 		if (!response.ok || data?.success !== true) {
 			const code = data?.errors?.[0]?.code;
