@@ -2,12 +2,9 @@ import settingService from '../service/setting-service';
 import userService from '../service/user-service';
 
 const dbInit = {
-	async init(c) {
-
-		const secret = c.req.param('secret');
-
-		if (secret !== c.env.jwt_secret) {
-			return c.text('❌ JWT secret mismatch');
+	async init(c, secret) {
+		if (!c.env.jwt_secret || secret !== c.env.jwt_secret) {
+			return c.text('❌ JWT secret mismatch', 401);
 		}
 
 		await this.intDB(c);
